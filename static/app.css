@@ -1,0 +1,28 @@
+.words-root {
+    font-family: 'Helvetica Neue', Arial, sans-serif;
+    text-align: center;
+}
+.words-root .guess .tile {
+    border: 1px solid #d3d6da;
+    font-size: 2em;
+    display: inline-block;
+    text-transform: uppercase;
+    width: 80px;
+    height: 60px;
+    text-align: center;
+    padding: 20px 0 0 0;
+    margin: 3px;
+}
+.words-root .nomatch,
+.words-root .match {
+    color: white;
+}
+.words-root .nomatch {
+    background-color: #787c7e;
+}
+.words-root .match.partial {
+    background-color: #c9b458;
+}
+.words-root .match.exact {
+    background-color: #6aaa64;
+}
