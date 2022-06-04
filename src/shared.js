@@ -1,4 +1,5 @@
 const Words = {
+
     /**
      * @param {integer} length The word length
      * @return {string}
@@ -7,6 +8,7 @@ const Words = {
         const dict = Dictionaries[length]
         return dict[Math.floor(Math.random() * dict.length)]
     },
+
     /**
      * @param {string}
      * @return {boolean}
@@ -14,6 +16,7 @@ const Words = {
     isWord: function(input) {
         return input in DictionaryMaps[input.length]
     },
+
     /**
      * @param {string} guess
      * @param {string} answer
@@ -35,11 +38,23 @@ const Words = {
                 result.push(0)
                 continue
             }
-            occurs[letter] -= 1
             if (letter === answer[i]) {
+                occurs[letter] -= 1
                 result.push(2)
             } else {
-                result.push(1)
+                // defer
+                result.push(null)
+            }
+        }
+        for (let i = 0; i < guess.length; i++) {
+            if (result[i] === null) {
+                let letter = guess[i]
+                if (occurs[letter]) {
+                    occurs[letter] -= 1
+                    result[i] = 1
+                } else {
+                    result[i] = 0
+                }
             }
         }
         return result
