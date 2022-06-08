@@ -18,11 +18,19 @@ const Words = {
     },
 
     /**
+     * @param {integer} length
+     * @return {string[]} A copy of the dictionary.
+     */
+    getDictionary: function(length) {
+        return Dictionaries[length].slice(0)
+    },
+
+    /**
      * @param {string} guess
      * @param {string} answer
      * @return {integer[]}
      */
-    guessResult: function(guess, answer) {
+    getClue: function(guess, answer) {
         const occurs = {}
         for (let i = 0; i < answer.length; i++) {
             let letter = answer[i]
@@ -31,35 +39,101 @@ const Words = {
             }
             occurs[letter] += 1
         }
-        const result = []
+        const clue = []
         for (let i = 0; i < guess.length; i++) {
             let letter = guess[i]
             if (!occurs[letter]) {
-                result.push(0)
+                clue.push(0)
                 continue
             }
             if (letter === answer[i]) {
                 occurs[letter] -= 1
-                result.push(2)
+                clue.push(2)
             } else {
                 // defer
-                result.push(null)
+                clue.push(null)
             }
         }
         for (let i = 0; i < guess.length; i++) {
-            if (result[i] === null) {
+            if (clue[i] === null) {
                 let letter = guess[i]
                 if (occurs[letter]) {
                     occurs[letter] -= 1
-                    result[i] = 1
+                    clue[i] = 1
                 } else {
-                    result[i] = 0
+                    clue[i] = 0
                 }
             }
         }
-        return result
+        return clue
     },
 
+    /**
+     * @param {string} guess
+     * @param {integer[]} clue
+     * @param {string[]} candidates
+     * @return {string[]}
+     */
+    reduceCandidates: function(guess, clue, candidates) {
+        if (guess.length !== clue.length) {
+            throw new Error("guess/clue length mismatch: " + guess.length + ' != ' + clue.length)
+        }
+        const possible = []
+        const lettersNot = {}
+        const occurs = {}
+        for (let i = 0; i < guess.length; i++) {
+            let letter = guess[i]
+            let clueCode = clue[i]
+            if (clueCode === 1 || clueCode === 2) {
+                if (!occurs[letter]) {
+                    occurs[letter] = 0
+                }
+                occurs[letter] += 1
+            } else if (clueCode !== 0) {
+                throw new Error("Unknown clue code: " + clueCode)
+            }
+        }
+        for (let i = 0; i < guess.length; i++) {
+            let letter = guess[i]
+            let clueCode = clue[i]
+            if (clueCode === 0 && !occurs[letter]) {
+                lettersNot[letter] = true
+            }
+        }
+        candidates.forEach(candidate => {
+            if (candidate.length !== guess.length) {
+                throw new Error("Invalid candidate: " + candidate)
+            }
+            const occ = {...occurs}
+            for (let i = 0; i < candidate.length; i++) {
+                let letter = candidate[i]
+                if (lettersNot[letter]) {
+                    // Candidate contains a letter not in solution.
+                    return
+                }
+                let clueCode = clue[i]
+                if (clueCode === 2 && letter !== guess[i]) {
+                    // The letter is not the exact letter at position.
+                    return
+                }
+                if (clueCode === 1 && letter === guess[i]) {
+                    // The letter is the partial letter at position.
+                    return
+                }
+                if (occ[letter]) {
+                    occ[letter] -= 1
+                }
+            }
+            for (var count of Object.values(occ)) {
+                if (count) {
+                    // Candidate has not used all occurring letters.
+                    return
+                }
+            }
+            possible.push(candidate)
+        })
+        return possible
+    }
 }
 
 const Dictionaries = {

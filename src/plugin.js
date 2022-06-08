@@ -81,22 +81,14 @@
         this.destroy()
         Api.instances[this.id] = this
         opts = this.opts = $.extend(true, Plugin.defaults, this.opts, opts)
-        this.word = Words.selectWord(opts.wordLength)
+        this.answer = Words.selectWord(opts.wordLength)
         this.input = ''
         this.guess = 0
         this.finished = false
-        console.log(this.word)
-        const $board = $('<div/>')
-        for (var i = 0; i < opts.maxGuesses; i++) {
-            var $guess = $('<div/>').addClass(CLS.guess)
-            for (var j = 0; j < opts.wordLength; j++) {
-                var $tile = $('<div/>').addClass(CLS.tile)
-                $tile.html('&nbsp;')
-                $guess.append($tile)
-            }
-            $board.append($guess)
-        }
-        this.$root.empty().addClass(CLS.root).append($board)
+        this.history = []
+        this.candidates = Words.getDictionary(opts.wordLength)
+        // console.log(this.answer)
+        setupBoard.call(this)
         return this
     }
 
@@ -141,31 +133,19 @@
     }
 
     Api.fn.submit = function() {
-        // TODO ...
         if (this.finished || this.input.length !== this.opts.wordLength) {
             return
         }
         if (!Words.isWord(this.input)) {
-            // console.log('not a word')
+            // Not a word!
             return
         }
-        const result = Words.guessResult(this.input, this.word)
-        $('.' + CLS.guess + ':eq(' + this.guess + ')', this.$root)
-            .find('.' + CLS.tile).each(function(i) {
-                const $tile = $(this)
-                const rescode = result[i]
-                if (rescode > 0) {
-                    $tile.addClass(CLS.match)
-                    if (rescode === 1) {
-                        $tile.addClass(CLS.partial)
-                    } else if (rescode === 2) {
-                        $tile.addClass(CLS.exact)
-                    }
-                } else {
-                    $tile.addClass(CLS.nomatch)
-                }
-            })
-        if (this.guess === this.opts.maxGuesses - 1 || this.input === this.word) {
+        const clue = Words.getClue(this.input, this.answer)
+        highlightClue.call(this, clue)
+        this.history.push({input: this.input, clue})
+        this.candidates = Words.reduceCandidates(this.input, clue, this.candidates)
+        console.log(this.candidates)
+        if (this.guess === this.opts.maxGuesses - 1 || this.input === this.answer) {
             this.finished = true
         } else {
             this.guess += 1
@@ -197,5 +177,45 @@
             }
         })
     })
+
+    /**
+     * @private
+     * @param {integer[]} clue
+     */
+    function highlightClue(clue) {
+        $('.' + CLS.guess + ':eq(' + this.guess + ')', this.$root)
+            .find('.' + CLS.tile).each(function(i) {
+                const $tile = $(this)
+                const rescode = clue[i]
+                if (rescode > 0) {
+                    $tile.addClass(CLS.match)
+                    if (rescode === 1) {
+                        $tile.addClass(CLS.partial)
+                    } else if (rescode === 2) {
+                        $tile.addClass(CLS.exact)
+                    }
+                } else {
+                    $tile.addClass(CLS.nomatch)
+                }
+            })
+    }
+
+    /**
+     * @private
+     */
+    function setupBoard() {
+        const opts = this.opts
+        const $board = $('<div/>')
+        for (var i = 0; i < opts.maxGuesses; i++) {
+            var $guess = $('<div/>').addClass(CLS.guess)
+            for (var j = 0; j < opts.wordLength; j++) {
+                var $tile = $('<div/>').addClass(CLS.tile)
+                $tile.html('&nbsp;')
+                $guess.append($tile)
+            }
+            $board.append($guess)
+        }
+        this.$root.empty().addClass(CLS.root).append($board)
+    }
 
 })(jQuery);
