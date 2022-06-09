@@ -2,13 +2,18 @@
 
     const PLUGIN_NAME = 'words'
     const CLS = {
-        exact   : 'exact',
-        guess   : 'guess',
-        tile    : 'tile',
-        match   : 'match',
-        nomatch : 'nomatch',
-        partial : 'partial',
-        root    : 'words-root',
+        exact    : 'exact',
+        guess    : 'guess',
+        tile     : 'tile',
+        match    : 'match',
+        nomatch  : 'nomatch',
+        partial  : 'partial',
+        root     : 'words-root',
+        candCount : 'candidate-count',
+    }
+    const MODE = {
+        normal : 'normal',
+        clue   : 'clue',
     }
 
     function Plugin(opts) {
@@ -89,6 +94,7 @@
         this.candidates = Words.getDictionary(opts.wordLength)
         // console.log(this.answer)
         setupBoard.call(this)
+        writeCandidateCount.call(this)
         return this
     }
 
@@ -149,6 +155,7 @@
             this.finished = true
         } else {
             this.guess += 1
+            writeCandidateCount.call(this)
         }
         this.input = ''
         return this
@@ -213,9 +220,19 @@
                 $tile.html('&nbsp;')
                 $guess.append($tile)
             }
+            var $candCount = $('<span/>').addClass(CLS.candCount)
+            $guess.append($candCount)
             $board.append($guess)
         }
         this.$root.empty().addClass(CLS.root).append($board)
     }
 
+    /**
+     * @private
+     */
+    function writeCandidateCount() {
+        $('.' + CLS.guess + ':eq(' + this.guess + ')', this.$root)
+            .find('.' + CLS.candCount)
+            .text('' + this.candidates.length)
+    }
 })(jQuery);

@@ -13,6 +13,10 @@
     padding: 20px 0 0 0;
     margin: 3px;
 }
+.words-root .candidate-count {
+    color: #4c4c4c;
+    position: absolute;
+}
 .words-root .nomatch,
 .words-root .match {
     color: white;
