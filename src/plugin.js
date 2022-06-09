@@ -47,14 +47,14 @@
 
     function Api($root) {
         if ($root.length !== 1) {
-            throw new Error('Cannot create Api for length ' + $root.length)
+            $.error('Cannot create Api for length ' + $root.length)
         }
         const id = $root.attr('id')
         if (Api.instances[id]) {
-            throw new Error('Instance already created for id ' + id)
+            $.error('Instance already created for id ' + id)
         }
         if (id == null || !id.length) {
-            throw new Error('Cannot create Api for id "' + String(id) + '"')
+            $.error('Cannot create Api for id "' + String(id) + '"')
         }
         Object.defineProperties(this, {
             id    : {value: id},
@@ -95,6 +95,16 @@
         // console.log(this.answer)
         setupBoard.call(this)
         writeCandidateCount.call(this)
+        if (Api.activeInstance === null) {
+            Api.activeInstance = this
+        }
+        return this
+    }
+
+    Api.fn.reset = function() {
+        const answer = this.answer
+        this.init()
+        this.answer = answer
         return this
     }
 
@@ -115,7 +125,7 @@
         }
         letter = letter.toLowerCase()
         if (!/^[a-z]$/.test(letter)) {
-            throw new Error('Invalid letter: ' + letter)
+            $.error('Invalid letter: ' + letter)
         }
         if (this.input.length >= this.opts.wordLength) {
             return
@@ -161,16 +171,35 @@
         return this
     }
 
+    Api.fn.toggleCandidateCounts = function(value) {
+        $('.' + CLS.candCount, this.$root).toggle(value)
+    }
+
     $(document).ready(function() {
         $(document).on('keydown', function(e) {
             if (e.metaKey || e.ctrlKey || e.altKey) {
                 return
             }
             const api = Api.activeInstance
-            if (!api || api.finished) {
+            if (!api) {
                 return
             }
             const key = e.key.toLowerCase()
+            if (key === '#') {
+                api.toggleCandidateCounts()
+                return
+            }
+            if (key === '!') {
+                api.init()
+                return
+            }
+            if (key === '@') {
+                api.reset()
+                return
+            }
+            if (api.finished) {
+                return
+            }
             if (key === 'backspace') {
                 api.popLetter()
                 return
@@ -181,6 +210,7 @@
             }
             if (/^[a-z]$/.test(key)) {
                 api.pushLetter(key)
+                return
             }
         })
     })
