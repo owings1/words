@@ -80,6 +80,7 @@ const Words = {
         }
         const possible = []
         const lettersNot = {}
+        const lettersAbs = {}
         const occurs = {}
         for (let i = 0; i < guess.length; i++) {
             let letter = guess[i]
@@ -96,8 +97,12 @@ const Words = {
         for (let i = 0; i < guess.length; i++) {
             let letter = guess[i]
             let clueCode = clue[i]
-            if (clueCode === 0 && !occurs[letter]) {
-                lettersNot[letter] = true
+            if (clueCode === 0) {
+                if (!occurs[letter]) {
+                    lettersNot[letter] = true
+                } else {
+                    lettersAbs[letter] = occurs[letter]
+                }
             }
         }
         candidates.forEach(candidate => {
@@ -105,6 +110,7 @@ const Words = {
                 throw new Error("Invalid candidate: " + candidate)
             }
             const occ = {...occurs}
+            const letAbs = {...lettersAbs}
             for (let i = 0; i < candidate.length; i++) {
                 let letter = candidate[i]
                 if (lettersNot[letter]) {
@@ -119,6 +125,12 @@ const Words = {
                 if (clueCode === 1 && letter === guess[i]) {
                     // The letter is the partial letter at position.
                     return
+                }
+                if (letAbs[letter] === 0) {
+                    // The letter exceeds the known number of instances.
+                    return
+                } else if (letAbs[letter]) {
+                    letAbs[letter] -= 1
                 }
                 if (occ[letter]) {
                     occ[letter] -= 1
