@@ -21,7 +21,7 @@
             return Api.getInstance(this)
         }
         return this.each(function() {
-            var $root = $(this)
+            const $root = $(this)
             var api = Api.getInstance($root)
             if (api) {
                 if (typeof(api[opts]) === 'function') {
@@ -39,6 +39,7 @@
     }
 
     Plugin.defaults = {
+        mode       : MODE.normal,
         wordLength : 5,
         maxGuesses : 6,
     }
@@ -86,12 +87,17 @@
         this.destroy()
         Api.instances[this.id] = this
         opts = this.opts = $.extend(true, Plugin.defaults, this.opts, opts)
+        if (opts.mode !== MODE[opts.mode]) {
+            opts.mode = MODE.normal
+        }
         this.answer = Words.selectWord(opts.wordLength)
         this.input = ''
         this.guess = 0
         this.finished = false
         this.history = []
         this.candidates = Words.getDictionary(opts.wordLength)
+        this._clickHandler = clickHandler.bind(this)
+        this.$root.on('click', this._clickHandler)
         // console.log(this.answer)
         setupBoard.call(this)
         writeCandidateCount.call(this)
@@ -111,6 +117,8 @@
     Api.fn.destroy = function() {
         if (this.$root) {
             this.$root.removeClass(CLS.root)
+                .off('click', this._clickHandler)
+                .empty()
         }
         delete Api.instances[this.id]
         if (Api.activeInstance === this) {
@@ -176,43 +184,7 @@
     }
 
     $(document).ready(function() {
-        $(document).on('keydown', function(e) {
-            if (e.metaKey || e.ctrlKey || e.altKey) {
-                return
-            }
-            const api = Api.activeInstance
-            if (!api) {
-                return
-            }
-            const key = e.key.toLowerCase()
-            if (key === '#') {
-                api.toggleCandidateCounts()
-                return
-            }
-            if (key === '!') {
-                api.init()
-                return
-            }
-            if (key === '@') {
-                api.reset()
-                return
-            }
-            if (api.finished) {
-                return
-            }
-            if (key === 'backspace') {
-                api.popLetter()
-                return
-            }
-            if (key === 'enter') {
-                api.submit()
-                return
-            }
-            if (/^[a-z]$/.test(key)) {
-                api.pushLetter(key)
-                return
-            }
-        })
+        $(document).on('keydown', onKeydown)
     })
 
     /**
@@ -223,12 +195,12 @@
         $('.' + CLS.guess + ':eq(' + this.guess + ')', this.$root)
             .find('.' + CLS.tile).each(function(i) {
                 const $tile = $(this)
-                const rescode = clue[i]
-                if (rescode > 0) {
+                const clueCode = clue[i]
+                if (clueCode > 0) {
                     $tile.addClass(CLS.match)
-                    if (rescode === 1) {
+                    if (clueCode === 1) {
                         $tile.addClass(CLS.partial)
-                    } else if (rescode === 2) {
+                    } else if (clueCode === 2) {
                         $tile.addClass(CLS.exact)
                     }
                 } else {
@@ -237,6 +209,21 @@
             })
     }
 
+    function readClue() {
+        const clue = []
+        $('.' + CLS.guess + ':eq(' + this.guess + ')', this.$root)
+            .find('.' + CLS.tile).each(function(i) {
+                const $tile = $(this)
+                if ($tile.hasClass(CLS.exact)) {
+                    clue.push(2)
+                } else if ($tile.hasClass(CLS.partial)) {
+                    clue.push(1)
+                } else {
+                    clue.push(0)
+                }
+            })
+        return clue
+    }
     /**
      * @private
      */
@@ -265,4 +252,50 @@
             .find('.' + CLS.candCount)
             .text('' + this.candidates.length)
     }
+
+    function clickHandler(e) {
+        const $target = $(e.target)
+        if ($target.is('.' + CLS.tile)) {
+            console.log($target)
+        }
+    }
+
+    function onKeydown(e) {
+        if (e.metaKey || e.ctrlKey || e.altKey) {
+            return
+        }
+        const api = Api.activeInstance
+        if (!api) {
+            return
+        }
+        const key = e.key.toLowerCase()
+        if (key === '#') {
+            api.toggleCandidateCounts()
+            return
+        }
+        if (key === '!') {
+            api.init()
+            return
+        }
+        if (key === '@') {
+            api.reset()
+            return
+        }
+        if (api.finished) {
+            return
+        }
+        if (key === 'backspace') {
+            api.popLetter()
+            return
+        }
+        if (key === 'enter') {
+            api.submit()
+            return
+        }
+        if (/^[a-z]$/.test(key)) {
+            api.pushLetter(key)
+            return
+        }
+    }
+
 })(jQuery);
