@@ -46,7 +46,7 @@
     $.fn[PLUGIN_NAME] = Plugin
 
     Plugin.defaults = {
-        mode       : MODE.clue,
+        mode       : MODE.answer,
         wordLength : 5,
         maxGuesses : 6,
     }
