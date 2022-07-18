@@ -28,11 +28,15 @@ const Words = {
     /**
      * @param {string} guess
      * @param {string} answer
-     * @return {integer[]}
+     * @return {Words.Clue}
      */
     getClue: function(guess, answer) {
+        const {length} = answer
+        if (length !== guess.length) {
+            throw new Error(`length mismatch ${length} != ${guess.length}`)
+        }
         const occurs = {}
-        for (let i = 0; i < answer.length; i++) {
+        for (let i = 0; i < length; i++) {
             let letter = answer[i]
             if (!occurs[letter]) {
                 occurs[letter] = 0
@@ -40,7 +44,7 @@ const Words = {
             occurs[letter] += 1
         }
         const clue = []
-        for (let i = 0; i < guess.length; i++) {
+        for (let i = 0; i < length; i++) {
             let letter = guess[i]
             if (!occurs[letter]) {
                 clue.push(0)
@@ -54,7 +58,7 @@ const Words = {
                 clue.push(null)
             }
         }
-        for (let i = 0; i < guess.length; i++) {
+        for (let i = 0; i < length; i++) {
             if (clue[i] === null) {
                 let letter = guess[i]
                 if (occurs[letter]) {
@@ -65,9 +69,22 @@ const Words = {
                 }
             }
         }
-        return clue
+        return new Words.Clue(clue)
     },
 
+    Clue: class extends Array {
+        constructor(clue) {
+            super(...clue)
+        }
+        isFullMatch() {
+            for (let i = 0; i < this.length; i++) {
+                if (this[i] !== 2) {
+                    return false
+                }
+            }
+            return true
+        }
+    },
     /**
      * @param {string} guess
      * @param {integer[]} clue
@@ -75,14 +92,15 @@ const Words = {
      * @return {string[]}
      */
     reduceCandidates: function(guess, clue, candidates) {
-        if (guess.length !== clue.length) {
-            throw new Error("guess/clue length mismatch: " + guess.length + ' != ' + clue.length)
+        const {length} = clue
+        if (length !== guess.length) {
+            throw new Error(`length mismatch ${length} != ${guess.length}`)
         }
         const possible = []
         const lettersNot = {}
         const lettersAbs = {}
         const occurs = {}
-        for (let i = 0; i < guess.length; i++) {
+        for (let i = 0; i < length; i++) {
             let letter = guess[i]
             let clueCode = clue[i]
             if (clueCode === 1 || clueCode === 2) {
@@ -91,10 +109,10 @@ const Words = {
                 }
                 occurs[letter] += 1
             } else if (clueCode !== 0) {
-                throw new Error("Unknown clue code: " + clueCode)
+                throw new Error(`Unknown clue code: ${clueCode}`)
             }
         }
-        for (let i = 0; i < guess.length; i++) {
+        for (let i = 0; i < length; i++) {
             let letter = guess[i]
             let clueCode = clue[i]
             if (clueCode === 0) {
@@ -106,12 +124,12 @@ const Words = {
             }
         }
         candidates.forEach(candidate => {
-            if (candidate.length !== guess.length) {
-                throw new Error("Invalid candidate: " + candidate)
+            if (candidate.length !== length) {
+                throw new Error(`Invalid candidate: ${candidate}`)
             }
             const occ = {...occurs}
             const letAbs = {...lettersAbs}
-            for (let i = 0; i < candidate.length; i++) {
+            for (let i = 0; i < length; i++) {
                 let letter = candidate[i]
                 if (lettersNot[letter]) {
                     // Candidate contains a letter not in solution.
@@ -136,7 +154,7 @@ const Words = {
                     occ[letter] -= 1
                 }
             }
-            for (var count of Object.values(occ)) {
+            for (let count of Object.values(occ)) {
                 if (count) {
                     // Candidate has not used all occurring letters.
                     return

@@ -18,15 +18,16 @@
     position: absolute;
 }
 .words-root .nomatch,
-.words-root .match {
+.words-root .match-partial,
+.words-root .match-exact {
     color: white;
 }
 .words-root .nomatch {
     background-color: #787c7e;
 }
-.words-root .match.partial {
+.words-root .match-partial {
     background-color: #c9b458;
 }
-.words-root .match.exact {
+.words-root .match-exact {
     background-color: #6aaa64;
 }
