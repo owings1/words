@@ -22,12 +22,6 @@
         })
     }
 
-    Plugin.defaults = {
-        mode       : MODE.clue,
-        wordLength : 5,
-        maxGuesses : 6,
-    }
-
     const PLUGIN_NAME = 'words'
 
     const CLS = {
@@ -50,6 +44,12 @@
     }
 
     $.fn[PLUGIN_NAME] = Plugin
+
+    Plugin.defaults = {
+        mode       : MODE.clue,
+        wordLength : 5,
+        maxGuesses : 6,
+    }
 
     $(document).ready(function() {
         $(document)
