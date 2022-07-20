@@ -1,5 +1,7 @@
 ;(function ($) {
 
+    // const Words = window.Words
+
     function Plugin(opts) {
         if (opts === 'instance') {
             return Api.getInstance(this)
@@ -15,8 +17,8 @@
             } else {
                 api = new Api($root)
                 api.init(opts)
-                if (!Api.activeInstance) {
-                    Api.activeInstance = api
+                if (!Api.active) {
+                    Api.active = api
                 }
             }
         })
@@ -58,7 +60,7 @@
             .on('change', onChange)
     })
 
-    class Api{
+    class Api {
 
         static getInstance(ref) {
             if (Api.instances[ref]) {
@@ -87,22 +89,27 @@
             Object.defineProperties(this, {
                 id    : {value: id},
                 $root : {value: $root},
-                mode  : {
-                    get: () => this.opts.mode,
-                    set: value => this.opts.mode = value
-                },
             })
             Api.instances[id] = this
         }
 
+        get mode() {
+            return MODE[this.opts.mode] || Plugin.defaults.mode
+        }
+
+        set mode(value) {
+            this.opts.mode = value
+        }
+
+        /**
+         * @param {object} opts
+         * @return {Api}
+         */
         init(opts) {
             this.destroy()
             this.$root.addClass(CLS.root)
             Api.instances[this.id] = this
             opts = this.opts = $.extend(true, Plugin.defaults, this.opts, opts)
-            if (opts.mode !== MODE[opts.mode]) {
-                opts.mode = MODE.answer
-            }
             if (this.mode === MODE.answer) {
                 this.answer = Words.selectWord(opts.wordLength)
             }
@@ -114,12 +121,15 @@
             setupBoard.call(this)
             setupControls.call(this)
             writeCandidateCount.call(this)
-            if (Api.activeInstance === null) {
-                Api.activeInstance = this
+            if (Api.active === null) {
+                Api.active = this
             }
             return this
         }
 
+        /**
+         * @return {Api}
+         */
         reset() {
             const answer = this.answer
             this.init()
@@ -130,21 +140,26 @@
                 case MODE.clue:
                     this.answer = undefined
                     break
-                default:
-                    $.error(`Invalid mode: ${this.mode}`)
             }
             return this
         }
 
+        /**
+         * @return {Api}
+         */
         destroy() {
             this.$root.empty()
             delete Api.instances[this.id]
-            if (Api.activeInstance === this) {
-                Api.activeInstance = null
+            if (Api.active === this) {
+                Api.active = null
             }
             return this
         }
 
+        /**
+         * @param {string} letter
+         * @return {Api}
+         */
         pushLetter(letter) {
             if (this.finished) {
                 return
@@ -163,6 +178,9 @@
             return this
         }
 
+        /**
+         * @return {Api}
+         */
         popLetter() {
             if (this.finished || !this.input.length) {
                 return
@@ -174,6 +192,9 @@
             return this
         }
 
+        /**
+         * @return {Api}
+         */
         submit() {
             if (this.finished || this.input.length !== this.opts.wordLength) {
                 return
@@ -193,12 +214,12 @@
                         this.answer = this.input
                     }
                     break
-                default:
-                    $.error(`Invalid mode: ${this.mode}`)
             }
-            this.candidates =  Words.reduceCandidates(this.input, clue, this.candidates)
+            const groups = Words.getGroups(this.input, this.candidates)
+            this.candidates = Words.reduceCandidates(this.input, clue, this.candidates)
             this.history.push({input: this.input, clue})
             console.log(this.candidates)
+            console.log(groups)
     
             highlightClue.call(this, clue)
             if (this.guessi === this.opts.maxGuesses - 1 || this.input === this.answer) {
@@ -211,13 +232,18 @@
             return this
         }
 
+        /**
+         * @param {bool} value
+         * @return {Api}
+         */
         toggleCandidatesCount(value) {
             $(`.${CLS.candCount}`, this.$root).toggle(value)
+            return this
         }
     }
 
     Api.instances = Object.create(null)
-    Api.activeInstance = null
+    Api.active = null
 
     /**
      * @private
@@ -229,13 +255,13 @@
                 const $tile = $(this)
                 const clueCode = clue[i]
                 switch (clueCode) {
-                    case 0:
+                    case Words.NOMATCH:
                         $tile.addClass(CLS.nomatch)
                         break
-                    case 1:
+                    case Words.PARTIAL:
                         $tile.addClass(CLS.partial)
                         break
-                    case 2:
+                    case Words.EXACT:
                         $tile.addClass(CLS.exact)
                         break
                     default:
@@ -254,11 +280,11 @@
             .find(`.${CLS.tile}`).each(function(i) {
                 const $tile = $(this)
                 if ($tile.hasClass(CLS.exact)) {
-                    clue.push(2)
+                    clue.push(Words.EXACT)
                 } else if ($tile.hasClass(CLS.partial)) {
-                    clue.push(1)
+                    clue.push(Words.PARTIAL)
                 } else {
-                    clue.push(0)
+                    clue.push(Words.NOMATCH)
                 }
             })
         return new Words.Clue(clue)
@@ -273,8 +299,7 @@
         for (let i = 0; i < opts.maxGuesses; i++) {
             let $guess = $('<div/>').addClass(CLS.guess)
             for (let j = 0; j < opts.wordLength; j++) {
-                let $tile = $('<div/>').addClass(CLS.tile)
-                $tile.html('&nbsp;')
+                let $tile = $('<div/>').addClass(CLS.tile).html('&nbsp;')
                 $guess.append($tile)
             }
             let $candCount = $('<span/>').addClass(CLS.candCount)
@@ -300,8 +325,7 @@
                 .addClass(CLS.mode)
                 .val(mode)
                 .prop('checked', mode === this.mode)
-            $fieldset.append($label)
-            $fieldset.append($input)
+            $fieldset.append($label).append($input)
         }
         this.$root.append($fieldset)
     }
@@ -316,15 +340,15 @@
     }
 
     function onClick(e) {
-        const api = Api.activeInstance
+        const api = Api.active
         const $target = $(e.target)
-        if ($target.hasClass(CLS.tile)) {
+        if (api.mode === MODE.clue && $target.hasClass(CLS.tile)) {
             if (api.finished) {
                 return
             }
             let $tile = $target
             let guessi = $tile.closest(`.${CLS.guess}`).index()
-            let tilei = $tile.index()
+            // let tilei = $tile.index()
             if (guessi !== api.guessi) {
                 return
             }
@@ -335,16 +359,17 @@
             } else {
                 $tile.removeClass(CLS.nomatch).addClass(CLS.partial)
             }
-            console.log(guessi, tilei, api.guessi)
+            return
         }
     }
 
     function onChange(e) {
-        const api = Api.activeInstance
+        const api = Api.active
         const $target = $(e.target)
         if ($target.is(':input') && $target.hasClass(CLS.mode)) {
             api.mode = $target.val()
             api.init()
+            return
         }
     }
 
@@ -352,7 +377,7 @@
         if (e.metaKey || e.ctrlKey || e.altKey) {
             return
         }
-        const api = Api.activeInstance
+        const api = Api.active
         if (!api) {
             return
         }

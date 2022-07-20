@@ -1,8 +1,12 @@
 const Words = {
 
+    NOMATCH: 0,
+    PARTIAL: 1,
+    EXACT: 2,
+
     /**
-     * @param {integer} length The word length
-     * @return {string}
+     * @param {integer} length The word length.
+     * @return {string} A random word.
      */
     selectWord: function(length) {
         const dict = Dictionaries[length]
@@ -47,12 +51,12 @@ const Words = {
         for (let i = 0; i < length; i++) {
             let letter = guess[i]
             if (!occurs[letter]) {
-                clue.push(0)
+                clue.push(Words.NOMATCH)
                 continue
             }
             if (letter === answer[i]) {
                 occurs[letter] -= 1
-                clue.push(2)
+                clue.push(Words.EXACT)
             } else {
                 // defer
                 clue.push(null)
@@ -73,9 +77,18 @@ const Words = {
     },
 
     Clue: class extends Array {
+        /**
+         * @param {integer[]} clue
+         */
         constructor(clue) {
-            super(...clue)
+            super()
+            if (clue) {
+                clue.forEach(num => this.push(num))
+            }
         }
+        /**
+         * @return {bool}
+         */
         isFullMatch() {
             for (let i = 0; i < this.length; i++) {
                 if (this[i] !== 2) {
@@ -83,6 +96,26 @@ const Words = {
                 }
             }
             return true
+        }
+        /**
+         * @return {integer}
+         */
+        hashCode() {
+            return Number(this.join(''))
+        }
+    },
+
+    Group: class extends Array {
+        /**
+         * @param {Words.Clue} clue
+         * @param {string[]} words
+         */
+        constructor(clue, words = null) {
+            super()
+            if (words) {
+                words.forEach(word => this.push(word))
+            }
+            this.clue = clue
         }
     },
     /**
@@ -103,19 +136,19 @@ const Words = {
         for (let i = 0; i < length; i++) {
             let letter = guess[i]
             let clueCode = clue[i]
-            if (clueCode === 1 || clueCode === 2) {
+            if (clueCode === Words.PARTIAL || clueCode === Words.EXACT) {
                 if (!occurs[letter]) {
                     occurs[letter] = 0
                 }
                 occurs[letter] += 1
-            } else if (clueCode !== 0) {
+            } else if (clueCode !== Words.NOMATCH) {
                 throw new Error(`Unknown clue code: ${clueCode}`)
             }
         }
         for (let i = 0; i < length; i++) {
             let letter = guess[i]
             let clueCode = clue[i]
-            if (clueCode === 0) {
+            if (clueCode === Words.NOMATCH) {
                 if (!occurs[letter]) {
                     lettersNot[letter] = true
                 } else {
@@ -163,7 +196,25 @@ const Words = {
             possible.push(candidate)
         })
         return possible
-    }
+    },
+
+    /**
+     * @param {string} guess
+     * @param {string[]} candidates
+     * @return {Words.Group[]}
+     */
+    getGroups: function(guess, candidates) {
+        const cluesHash = Object.create(null)
+        candidates.forEach(candidate => {
+            const clue = Words.getClue(guess, candidate)
+            const hash = clue.hashCode()
+            if (!cluesHash[hash]) {
+                cluesHash[hash] = new Words.Group(clue)
+            }
+            cluesHash[hash].push(candidate)
+        })
+        return Object.values(cluesHash)
+    },
 }
 
 const Dictionaries = {
@@ -2493,12 +2544,10 @@ const Dictionaries = {
 
 const DictionaryMaps = Object.create(null)
 
-;(function() {
-    Object.keys(Dictionaries).forEach(length => {
-        const wordmap = DictionaryMaps[length] = {}
-        Dictionaries[length].forEach(word => wordmap[word] = true)
-    })
-})();
+Object.keys(Dictionaries).forEach(length => {
+    const wordmap = DictionaryMaps[length] = Object.create(null)
+    Dictionaries[length].forEach(word => wordmap[word] = true)
+})
 
 if (typeof window === 'undefined') {
     if (typeof module !== 'undefined') {
