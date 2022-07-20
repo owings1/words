@@ -1,220 +1,222 @@
-const Words = {
 
-    NOMATCH: 0,
-    PARTIAL: 1,
-    EXACT: 2,
+export const NOMATCH = 0
+export const PARTIAL = 1
+export const EXACT = 2
 
-    /**
-     * @param {integer} length The word length.
-     * @return {string} A random word.
-     */
-    selectWord: function(length) {
-        const dict = Dictionaries[length]
-        return dict[Math.floor(Math.random() * dict.length)]
-    },
+export class Clue extends Array {
 
     /**
-     * @param {string}
-     * @return {boolean}
+     * @param {integer[]} clue
      */
-    isWord: function(input) {
-        return input in DictionaryMaps[input.length]
-    },
-
-    /**
-     * @param {integer} length
-     * @return {string[]} A copy of the dictionary.
-     */
-    getDictionary: function(length) {
-        return Dictionaries[length].slice(0)
-    },
-
-    /**
-     * @param {string} guess
-     * @param {string} answer
-     * @return {Words.Clue}
-     */
-    getClue: function(guess, answer) {
-        const {length} = answer
-        if (length !== guess.length) {
-            throw new Error(`length mismatch ${length} != ${guess.length}`)
+    constructor(clue) {
+        super()
+        if (clue) {
+            clue.forEach(num => this.push(num))
         }
-        const occurs = {}
-        for (let i = 0; i < length; i++) {
-            let letter = answer[i]
+    }
+
+    /**
+     * @return {bool}
+     */
+    isFullMatch() {
+        for (let i = 0; i < this.length; i++) {
+            if (this[i] !== EXACT) {
+                return false
+            }
+        }
+        return true
+    }
+    /**
+     * @return {integer}
+     */
+    hashCode() {
+        return Number(this.join(''))
+    }
+}
+
+export class Group extends Array {
+    /**
+     * @param {Clue} clue
+     * @param {string[]} words
+     */
+    constructor(clue, words = null) {
+        super()
+        if (words) {
+            words.forEach(word => this.push(word))
+        }
+        this.clue = clue
+    }
+}
+
+/**
+ * @param {integer} length The word length.
+ * @return {string} A random word.
+ */
+export function selectWord(length) {
+    const dict = Dictionaries[length]
+    return dict[Math.floor(Math.random() * dict.length)]
+}
+
+/**
+ * @param {string}
+ * @return {boolean}
+ */
+export function isWord(input) {
+    return input in DictionaryMaps[input.length]
+
+}
+
+/**
+ * @param {integer} length The word length.
+ * @return {string[]} A copy of the dictionary.
+ */
+export function getDictionary(length) {
+    return Dictionaries[length].slice(0)
+}
+
+/**
+ * @param {string} guess
+ * @param {string} answer
+ * @return {Clue}
+ */
+export function getClue(guess, answer) {
+    const {length} = answer
+    if (length !== guess.length) {
+        throw new Error(`length mismatch ${length} != ${guess.length}`)
+    }
+    const occurs = {}
+    for (let i = 0; i < length; i++) {
+        let letter = answer[i]
+        if (!occurs[letter]) {
+            occurs[letter] = 0
+        }
+        occurs[letter] += 1
+    }
+    const clue = new Clue
+    for (let i = 0; i < length; i++) {
+        let letter = guess[i]
+        if (!occurs[letter]) {
+            clue.push(NOMATCH)
+            continue
+        }
+        if (letter === answer[i]) {
+            occurs[letter] -= 1
+            clue.push(EXACT)
+        } else {
+            // defer
+            clue.push(null)
+        }
+    }
+    for (let i = 0; i < length; i++) {
+        if (clue[i] === null) {
+            let letter = guess[i]
+            if (occurs[letter]) {
+                occurs[letter] -= 1
+                clue[i] = PARTIAL
+            } else {
+                clue[i] = NOMATCH
+            }
+        }
+    }
+    return clue
+}
+
+/**
+ * @param {string} guess
+ * @param {integer[]} clue
+ * @param {string[]} candidates The candidates
+ * @return {string[]} Array of words
+ */
+export function reduceCandidates(guess, clue, candidates) {
+    const {length} = clue
+    if (length !== guess.length) {
+        throw new Error(`length mismatch ${length} != ${guess.length}`)
+    }
+    const possible = []
+    const lettersNot = {}
+    const lettersAbs = {}
+    const occurs = {}
+    for (let i = 0; i < length; i++) {
+        let letter = guess[i]
+        let clueCode = clue[i]
+        if (clueCode === PARTIAL || clueCode === EXACT) {
             if (!occurs[letter]) {
                 occurs[letter] = 0
             }
             occurs[letter] += 1
+        } else if (clueCode !== NOMATCH) {
+            throw new Error(`Unknown clue code: ${clueCode}`)
         }
-        const clue = []
-        for (let i = 0; i < length; i++) {
-            let letter = guess[i]
+    }
+    for (let i = 0; i < length; i++) {
+        let letter = guess[i]
+        let clueCode = clue[i]
+        if (clueCode === NOMATCH) {
             if (!occurs[letter]) {
-                clue.push(Words.NOMATCH)
-                continue
-            }
-            if (letter === answer[i]) {
-                occurs[letter] -= 1
-                clue.push(Words.EXACT)
+                lettersNot[letter] = true
             } else {
-                // defer
-                clue.push(null)
+                lettersAbs[letter] = occurs[letter]
             }
         }
+    }
+    candidates.forEach(candidate => {
+        if (candidate.length !== length) {
+            throw new Error(`Invalid candidate: ${candidate}`)
+        }
+        const occ = {...occurs}
+        const letAbs = {...lettersAbs}
         for (let i = 0; i < length; i++) {
-            if (clue[i] === null) {
-                let letter = guess[i]
-                if (occurs[letter]) {
-                    occurs[letter] -= 1
-                    clue[i] = 1
-                } else {
-                    clue[i] = 0
-                }
+            let letter = candidate[i]
+            if (lettersNot[letter]) {
+                // Candidate contains a letter not in solution.
+                return
             }
-        }
-        return new Words.Clue(clue)
-    },
-
-    Clue: class extends Array {
-        /**
-         * @param {integer[]} clue
-         */
-        constructor(clue) {
-            super()
-            if (clue) {
-                clue.forEach(num => this.push(num))
-            }
-        }
-        /**
-         * @return {bool}
-         */
-        isFullMatch() {
-            for (let i = 0; i < this.length; i++) {
-                if (this[i] !== 2) {
-                    return false
-                }
-            }
-            return true
-        }
-        /**
-         * @return {integer}
-         */
-        hashCode() {
-            return Number(this.join(''))
-        }
-    },
-
-    Group: class extends Array {
-        /**
-         * @param {Words.Clue} clue
-         * @param {string[]} words
-         */
-        constructor(clue, words = null) {
-            super()
-            if (words) {
-                words.forEach(word => this.push(word))
-            }
-            this.clue = clue
-        }
-    },
-    /**
-     * @param {string} guess
-     * @param {integer[]} clue
-     * @param {string[]} candidates
-     * @return {string[]}
-     */
-    reduceCandidates: function(guess, clue, candidates) {
-        const {length} = clue
-        if (length !== guess.length) {
-            throw new Error(`length mismatch ${length} != ${guess.length}`)
-        }
-        const possible = []
-        const lettersNot = {}
-        const lettersAbs = {}
-        const occurs = {}
-        for (let i = 0; i < length; i++) {
-            let letter = guess[i]
             let clueCode = clue[i]
-            if (clueCode === Words.PARTIAL || clueCode === Words.EXACT) {
-                if (!occurs[letter]) {
-                    occurs[letter] = 0
-                }
-                occurs[letter] += 1
-            } else if (clueCode !== Words.NOMATCH) {
-                throw new Error(`Unknown clue code: ${clueCode}`)
+            if (clueCode === EXACT && letter !== guess[i]) {
+                // The letter is not the exact letter at position.
+                return
+            }
+            if (clueCode === PARTIAL && letter === guess[i]) {
+                // The letter is the partial letter at position.
+                return
+            }
+            if (letAbs[letter] === 0) {
+                // The letter exceeds the known number of instances.
+                return
+            } else if (letAbs[letter]) {
+                letAbs[letter] -= 1
+            }
+            if (occ[letter]) {
+                occ[letter] -= 1
             }
         }
-        for (let i = 0; i < length; i++) {
-            let letter = guess[i]
-            let clueCode = clue[i]
-            if (clueCode === Words.NOMATCH) {
-                if (!occurs[letter]) {
-                    lettersNot[letter] = true
-                } else {
-                    lettersAbs[letter] = occurs[letter]
-                }
+        for (let count of Object.values(occ)) {
+            if (count) {
+                // Candidate has not used all occurring letters.
+                return
             }
         }
-        candidates.forEach(candidate => {
-            if (candidate.length !== length) {
-                throw new Error(`Invalid candidate: ${candidate}`)
-            }
-            const occ = {...occurs}
-            const letAbs = {...lettersAbs}
-            for (let i = 0; i < length; i++) {
-                let letter = candidate[i]
-                if (lettersNot[letter]) {
-                    // Candidate contains a letter not in solution.
-                    return
-                }
-                let clueCode = clue[i]
-                if (clueCode === 2 && letter !== guess[i]) {
-                    // The letter is not the exact letter at position.
-                    return
-                }
-                if (clueCode === 1 && letter === guess[i]) {
-                    // The letter is the partial letter at position.
-                    return
-                }
-                if (letAbs[letter] === 0) {
-                    // The letter exceeds the known number of instances.
-                    return
-                } else if (letAbs[letter]) {
-                    letAbs[letter] -= 1
-                }
-                if (occ[letter]) {
-                    occ[letter] -= 1
-                }
-            }
-            for (let count of Object.values(occ)) {
-                if (count) {
-                    // Candidate has not used all occurring letters.
-                    return
-                }
-            }
-            possible.push(candidate)
-        })
-        return possible
-    },
+        possible.push(candidate)
+    })
+    return possible
+}
 
-    /**
-     * @param {string} guess
-     * @param {string[]} candidates
-     * @return {Words.Group[]}
-     */
-    getGroups: function(guess, candidates) {
-        const cluesHash = Object.create(null)
-        candidates.forEach(candidate => {
-            const clue = Words.getClue(guess, candidate)
-            const hash = clue.hashCode()
-            if (!cluesHash[hash]) {
-                cluesHash[hash] = new Words.Group(clue)
-            }
-            cluesHash[hash].push(candidate)
-        })
-        return Object.values(cluesHash)
-    },
+/**
+ * @param {string} guess
+ * @param {string[]} candidates
+ * @return {Group[]}
+ */
+export function getGroups(guess, candidates) {
+    const cluesHash = Object.create(null)
+    candidates.forEach(candidate => {
+        const clue = getClue(guess, candidate)
+        const hash = clue.hashCode()
+        if (!cluesHash[hash]) {
+            cluesHash[hash] = new Group(clue)
+        }
+        cluesHash[hash].push(candidate)
+    })
+    return Object.values(cluesHash)
 }
 
 const Dictionaries = {
@@ -2548,9 +2550,3 @@ Object.keys(Dictionaries).forEach(length => {
     const wordmap = DictionaryMaps[length] = Object.create(null)
     Dictionaries[length].forEach(word => wordmap[word] = true)
 })
-
-if (typeof window === 'undefined') {
-    if (typeof module !== 'undefined') {
-        module.exports = Words
-    }
-}

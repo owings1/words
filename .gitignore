@@ -1,7 +1,7 @@
 /tmp
 /.tm_properties
 /local
-
+/.vscode
 # Logs
 logs
 *.log
