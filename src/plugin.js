@@ -206,14 +206,15 @@ class Api {
         if (this.finished || this.input.length !== this.opts.wordLength) {
             return
         }
-        if (!Words.isWord(this.input)) {
-            // Not a word!
-            return
-        }
+
         /** @type {Words.Clue} */
         let clue
         switch (this.mode) {
             case MODE.answer:
+                if (!Words.isWord(this.input)) {
+                    // Not a word!
+                    return
+                }
                 clue = Words.getClue(this.input, this.answer)
                 break
             case MODE.clue:
