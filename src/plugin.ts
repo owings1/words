@@ -1,21 +1,24 @@
-import * as Words from './shared.js'
+import {Clue} from './core.js'
+import * as Core from './core.js'
 import $ from './jquery.js'
 
-function Plugin(opts) {
-    if (opts === 'instance') {
+$(() => $(document).on({keydown, click, change}))
+
+export default function Plugin(this: JQuery<HTMLElement>, opt?: string|PluginOpts) {
+    if (opt === 'instance') {
         return Api.getInstance(this)
     }
     return this.each(function() {
         const $root = $(this)
         let api = Api.getInstance($root)
         if (api) {
-            if (typeof(api[opts]) === 'function') {
+            if (typeof opt === 'string' && typeof(api[opt]) === 'function') {
                 const args = Array.prototype.slice.call(arguments, 1)
-                api[opts].apply(api, args)
+                api[opt].apply(api, args)
             }
         } else {
             api = new Api($root)
-            api.init(opts)
+            api.init(opt as PluginOpts)
             if (!Api.active) {
                 Api.active = api
             }
@@ -23,65 +26,78 @@ function Plugin(opts) {
     })
 }
 
-const PLUGIN_NAME = 'words'
-
-const CLS = {
-    board    : 'board',
-    controls : 'controls',
-    exact    : 'match-exact',
-    guess    : 'guess',
-    tile     : 'tile',
-    match    : 'match',
-    nomatch  : 'nomatch',
-    partial  : 'match-partial',
-    root     : 'words-root',
-    mode     : 'mode',
-    candCount : 'candidate-count',
+enum CLS {
+    board    = 'board',
+    controls = 'controls',
+    exact    = 'match-exact',
+    guess    = 'guess',
+    tile     = 'tile',
+    match    = 'match',
+    nomatch  = 'nomatch',
+    partial  = 'match-partial',
+    root     = 'words-root',
+    mode     = 'mode',
+    candCount = 'candidate-count',
 }
 
-const MODE = {
-    answer : 'answer',
-    clue   : 'clue',
+enum MODE {
+    answer = 'answer',
+    clue   = 'clue',
 }
 
-$.fn[PLUGIN_NAME] = Plugin
-
-Plugin.defaults = {
-    mode       : MODE.answer,
-    wordLength : 5,
-    maxGuesses : 6,
+type PluginOpts = {
+    mode: MODE,
+    wordLength: number,
+    maxGuesses: number,
 }
 
-$(() => {
-    $(document)
-        .on('keydown', onKeydown)
-        .on('click', onClick)
-        .on('change', onChange)
-})
+const symRoot = Symbol()
+const symId = Symbol()
+const RegexLetter = /^[a-z]$/
 
 class Api {
 
+    static active: Api|null = null
+    static instances: {string: Api} = Object.create(null)
+    static defaults: PluginOpts = {
+        mode       : MODE.answer,
+        wordLength : 5,
+        maxGuesses : 6,
+    };
+
+    [symId]: string
+    [symRoot]: JQuery<HTMLElement>
+
+    input: string
+    guessi: number
+    answer?: string
+    finished: boolean
+    opts: PluginOpts
+    candidates: string[]
+    history: {
+        input: string,
+        clue: Clue,
+    }[]
+
     /**
-     * @param {string|object} ref The reference selector or element.
-     * @return {Api} The associated instance.
+     * @param ref The reference selector or element.
+     * @return The associated instance.
      */
-    static getInstance(ref) {
-        if (Api.instances[ref]) {
+    static getInstance(ref: string|HTMLElement|JQuery<HTMLElement>): Api {
+        if (typeof ref === 'string' && Api.instances[ref]) {
             return Api.instances[ref]
         }
-        if (typeof ref.attr !== 'function') {
-            ref = $(ref)
+        const $ref = $(ref as string)
+        if ($ref.length > 1) {
+            $.error(`Cannot get instance for object with length ${$ref.length}`)
         }
-        if (ref.length > 1) {
-            $.error(`Cannot get instance for object with length ${ref.length}`)
-        }
-        return Api.instances[ref.attr('id')]
+        return Api.instances[$ref.attr('id')]
     }
 
     /**
-     * @param {object} $root The root jQuery element.
+     * @param $root The root jQuery element.
      */
-    constructor($root) {
+    constructor($root: JQuery<HTMLElement>) {
         if ($root.length !== 1) {
             $.error(`Cannot create Api for length ${$root.length}`)
         }
@@ -90,41 +106,42 @@ class Api {
             $.error(`Instance already created for id ${id}`)
         }
         if (id == null || !id.length) {
-            $.error(`Cannot create Api for id '${String(id)}'`)
+            $.error(`Cannot create Api for id '${id}'`)
         }
-        Object.defineProperties(this, {
-            id    : {value: id},
-            $root : {value: $root},
-        })
+        this[symRoot] = $root
+        this[symId] = id
         Api.instances[id] = this
     }
 
-    /** @type {string} */
-    get mode() {
-        return MODE[this.opts.mode] || Plugin.defaults.mode
+    get id() {
+        return this[symId]
     }
 
-    set mode(value) {
+    get $root() {
+        return this[symRoot]
+    }
+
+    get mode() {
+        return MODE[this.opts.mode] || Api.defaults.mode
+    }
+
+    set mode(value: MODE) {
         this.opts.mode = value
     }
 
-    /**
-     * @param {object} opts
-     * @return {Api} self
-     */
-    init(opts = undefined) {
+    init(opts?: PluginOpts): this {
         this.destroy()
         this.$root.addClass(CLS.root)
         Api.instances[this.id] = this
-        opts = this.opts = $.extend(true, Plugin.defaults, this.opts, opts)
+        this.opts = $.extend(true, Api.defaults, this.opts, opts)
         if (this.mode === MODE.answer) {
-            this.answer = Words.selectWord(opts.wordLength)
+            this.answer = Core.selectWord(this.opts.wordLength)
         }
         this.input = ''
         this.guessi = 0
         this.finished = false
         this.history = []
-        this.candidates = Words.getDictionary(opts.wordLength)
+        this.candidates = Core.getDictionary(this.opts.wordLength)
         setupBoard.call(this)
         setupControls.call(this)
         writeCandidateCount.call(this)
@@ -134,11 +151,8 @@ class Api {
         return this
     }
 
-    /**
-     * @return {Api} self
-     */
-    reset() {
-        const answer = this.answer
+    reset(): this {
+        const {answer} = this
         this.init()
         switch (this.mode) {
             case MODE.answer:
@@ -151,10 +165,7 @@ class Api {
         return this
     }
 
-    /**
-     * @return {Api} self
-     */
-    destroy() {
+    destroy(): this {
         this.$root.empty()
         delete Api.instances[this.id]
         if (Api.active === this) {
@@ -163,20 +174,16 @@ class Api {
         return this
     }
 
-    /**
-     * @param {string} letter
-     * @return {Api} self
-     */
-    pushLetter(letter) {
+    pushLetter(letter: string): this {
         if (this.finished) {
-            return
+            return this
         }
         letter = letter.toLowerCase()
-        if (!/^[a-z]$/.test(letter)) {
+        if (!RegexLetter.test(letter)) {
             $.error(`Invalid letter: ${letter}`)
         }
         if (this.input.length >= this.opts.wordLength) {
-            return
+            return this
         }
         $(`.${CLS.guess}:eq(${this.guessi})`, this.$root)
             .find(`.${CLS.tile}:eq(${this.input.length})`)
@@ -185,12 +192,9 @@ class Api {
         return this
     }
 
-    /**
-     * @return {Api} self
-     */
-    popLetter() {
+    popLetter(): this {
         if (this.finished || !this.input.length) {
-            return
+            return this
         }
         this.input = this.input.substring(0, this.input.length - 1)
         $(`.${CLS.guess}:eq(${this.guessi})`, this.$root)
@@ -199,23 +203,19 @@ class Api {
         return this
     }
 
-    /**
-     * @return {Api} self
-     */
-    submit() {
+    submit(): this {
         if (this.finished || this.input.length !== this.opts.wordLength) {
-            return
+            return this
         }
 
-        /** @type {Words.Clue} */
-        let clue
+        let clue: Clue
         switch (this.mode) {
             case MODE.answer:
-                if (!Words.isWord(this.input)) {
+                if (!Core.isWord(this.input)) {
                     // Not a word!
-                    return
+                    return this
                 }
-                clue = Words.getClue(this.input, this.answer)
+                clue = Core.getClue(this.input, this.answer)
                 break
             case MODE.clue:
                 clue = readClue.call(this)
@@ -224,9 +224,10 @@ class Api {
                 }
                 break
         }
-        const groups = Words.getGroups(this.input, this.candidates)
-        this.candidates = Words.reduceCandidates(this.input, clue, this.candidates)
+        const groups = Core.getGroups(this.input, this.candidates)
+        this.candidates = Core.reduceCandidates(this.input, clue, this.candidates)
         this.history.push({input: this.input, clue})
+
         console.log(this.candidates)
         console.log(groups)
 
@@ -241,36 +242,25 @@ class Api {
         return this
     }
 
-    /**
-     * @param {boolean} value The toggle boolean value.
-     * @return {Api} self
-     */
-    toggleCandidatesCount(value = undefined) {
+    toggleCandidatesCount(value?: boolean): this {
         $(`.${CLS.candCount}`, this.$root).toggle(value)
         return this
     }
 }
 
-Api.instances = Object.create(null)
-Api.active = null
-
-/**
- * @private Api private method.
- * @param {Words.Clue} clue
- */
-function highlightClue(clue) {
+function highlightClue(this: Api, clue: Clue) {
     $(`.${CLS.guess}:eq(${this.guessi})`, this.$root)
         .find(`.${CLS.tile}`).each(function(i) {
             const $tile = $(this)
             const clueCode = clue[i]
             switch (clueCode) {
-                case Words.NOMATCH:
+                case Core.NOMATCH:
                     $tile.addClass(CLS.nomatch)
                     break
-                case Words.PARTIAL:
+                case Core.PARTIAL:
                     $tile.addClass(CLS.partial)
                     break
-                case Words.EXACT:
+                case Core.EXACT:
                     $tile.addClass(CLS.exact)
                     break
                 default:
@@ -279,56 +269,50 @@ function highlightClue(clue) {
         })
 }
 
-/**
- * @private Api private method.
- * @return {Words.Clue}
- */
-function readClue() {
-    const clue = new Words.Clue
+function readClue(this: Api): Clue {
+    const clue = new Clue
     $(`.${CLS.guess}:eq(${this.guessi})`, this.$root)
-        .find(`.${CLS.tile}`).each(function(i) {
+        .find(`.${CLS.tile}`).each(function() {
             const $tile = $(this)
             if ($tile.hasClass(CLS.exact)) {
-                clue.push(Words.EXACT)
+                clue.push(Core.EXACT)
             } else if ($tile.hasClass(CLS.partial)) {
-                clue.push(Words.PARTIAL)
+                clue.push(Core.PARTIAL)
             } else {
-                clue.push(Words.NOMATCH)
+                clue.push(Core.NOMATCH)
             }
         })
     return clue
 }
 
-/**
- * @private Api private method.
- */
-function setupBoard() {
+function setupBoard(this: Api) {
     const {opts} = this
     const $board = $('<div/>').addClass(CLS.board)
     for (let i = 0; i < opts.maxGuesses; i++) {
-        let $guess = $('<div/>').addClass(CLS.guess)
+        const $guess = $('<div/>').addClass(CLS.guess)
         for (let j = 0; j < opts.wordLength; j++) {
-            let $tile = $('<div/>').addClass(CLS.tile).html('&nbsp;')
-            $guess.append($tile)
+            $('<div/>')
+                .addClass(CLS.tile)
+                .html('&nbsp;')
+                .appendTo($guess)
         }
-        let $candCount = $('<span/>').addClass(CLS.candCount)
-        $guess.append($candCount)
+        $('<span/>')
+            .addClass(CLS.candCount)
+            .appendTo($guess)
         $board.append($guess)
     }
     this.$root.append($board)
 }
 
-/**
- * @private Api private method.
- */
-function setupControls() {
-    const $fieldset = $('<fieldset/>').append('<legend>Mode</legend>')
-    for (let mode in MODE) {
-        let id = `${this.id}_mode_${mode}`
-        let $label = $('<label/>')
+function setupControls(this: Api) {
+    const $fieldset = $('<fieldset/>')
+    $('<legend/>').text('Mode').appendTo($fieldset)
+    for (const mode in MODE) {
+        const id = `${this.id}_mode_${mode}`
+        const $label = $('<label/>')
             .attr({for: id})
             .text(mode)
-        let $input = $('<input/>')
+        const $input = $('<input/>')
             .attr({id, type: 'radio', name: 'mode'})
             .addClass(CLS.mode)
             .val(mode)
@@ -338,25 +322,24 @@ function setupControls() {
     this.$root.append($fieldset)
 }
 
-/**
- * @private Api private method.
- */
-function writeCandidateCount() {
+function writeCandidateCount(this: Api) {
     $(`.${CLS.guess}:eq(${this.guessi})`, this.$root)
         .find(`.${CLS.candCount}`)
         .text(`${this.candidates.length}`)
 }
 
-function onClick(e) {
+function click(e: MouseEvent) {
     const api = Api.active
+    if (!api) {
+        return
+    }
     const $target = $(e.target)
     if (api.mode === MODE.clue && $target.hasClass(CLS.tile)) {
         if (api.finished) {
             return
         }
-        let $tile = $target
-        let guessi = $tile.closest(`.${CLS.guess}`).index()
-        // let tilei = $tile.index()
+        const $tile = $target
+        const guessi = $tile.closest(`.${CLS.guess}`).index()
         if (guessi !== api.guessi) {
             return
         }
@@ -371,17 +354,20 @@ function onClick(e) {
     }
 }
 
-function onChange(e) {
+function change(e: Event) {
     const api = Api.active
+    if (!api) {
+        return
+    }
     const $target = $(e.target)
     if ($target.is(':input') && $target.hasClass(CLS.mode)) {
-        api.mode = $target.val()
+        api.mode = MODE[String($target.val())]
         api.init()
         return
     }
 }
 
-function onKeydown(e) {
+function keydown(e: KeyboardEvent) {
     if (e.metaKey || e.ctrlKey || e.altKey) {
         return
     }
@@ -390,30 +376,30 @@ function onKeydown(e) {
         return
     }
     const key = e.key.toLowerCase()
-    if (key === '#') {
-        api.toggleCandidateCounts()
-        return
-    }
-    if (key === '!') {
-        api.init()
-        return
-    }
-    if (key === '@') {
-        api.reset()
-        return
+    switch (key) {
+        case '#':
+            api.toggleCandidatesCount()
+            return
+        case '!':
+            api.init()
+            return
+        case '@':
+            api.reset()
+            return
+
     }
     if (api.finished) {
         return
     }
-    if (key === 'backspace') {
-        api.popLetter()
-        return
+    switch (key) {
+        case 'backspace':
+            api.popLetter()
+            return
+        case 'enter':
+            api.submit()
+            return
     }
-    if (key === 'enter') {
-        api.submit()
-        return
-    }
-    if (/^[a-z]$/.test(key)) {
+    if (RegexLetter.test(key)) {
         api.pushLetter(key)
         return
     }

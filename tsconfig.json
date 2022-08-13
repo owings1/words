@@ -1,0 +1,39 @@
+{
+    "compilerOptions": {
+        "declaration": true,
+        "target": "ES2020",
+        "module": "es2020",
+        "outDir": "dist",
+        "rootDir": "src",
+        "strict": false,
+        "noImplicitAny": false,
+        "strictNullChecks": false,
+        "checkJs": true,
+        "allowJs": true,
+        "moduleResolution": "node",
+        "types": [
+            "node",
+            "mocha",
+            "jquery",
+            "jqueryui"
+        ],
+        "lib": [
+            "es6",
+            "dom"
+        ],
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "allowUnreachableCode": true,
+        "useUnknownInCatchVariables": false
+    },
+    "include": [
+        "src/**/*.ts",
+        "src/**/*.js"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "<node_internals>/**"
+    ]
+}
