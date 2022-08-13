@@ -11,10 +11,6 @@
     "build": "npm run clean && npm run compile && cp src/*.css src/*.html dist/",
     "test": "NODE_OPTIONS='--loader ts-node/esm --no-warnings' mocha"
   },
-  "dependencies": {
-    "jquery": "^3.6.0",
-    "jquery-ui": "^1.13.2"
-  },
   "devDependencies": {
     "@types/chai": "^4.3.1",
     "@types/jquery": "^3.5.14",
