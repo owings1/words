@@ -37,6 +37,7 @@ enum CLS {
     partial  = 'match-partial',
     root     = 'words-root',
     mode     = 'mode',
+    candidates = 'candidates',
     candCount = 'candidate-count',
 }
 
@@ -121,6 +122,14 @@ class Api {
         return this[symRoot]
     }
 
+    get $candidates() {
+        return $(`.${CLS.candidates}`, this.$root)
+    }
+
+    get $guess() {
+        return getGuess.call(this)
+    }
+
     get mode() {
         return MODE[this.opts.mode] || Api.defaults.mode
     }
@@ -144,6 +153,7 @@ class Api {
         this.candidates = Core.getDictionary(this.opts.wordLength)
         setupBoard.call(this)
         setupControls.call(this)
+        setupDetails.call(this)
         writeCandidateCount.call(this)
         if (Api.active === null) {
             Api.active = this
@@ -185,7 +195,7 @@ class Api {
         if (this.input.length >= this.opts.wordLength) {
             return this
         }
-        $(`.${CLS.guess}:eq(${this.guessi})`, this.$root)
+        this.$guess
             .find(`.${CLS.tile}:eq(${this.input.length})`)
             .text(letter)
         this.input += letter
@@ -197,7 +207,7 @@ class Api {
             return this
         }
         this.input = this.input.substring(0, this.input.length - 1)
-        $(`.${CLS.guess}:eq(${this.guessi})`, this.$root)
+        this.$guess
             .find(`.${CLS.tile}:eq(${this.input.length})`)
             .html('&nbsp;')
         return this
@@ -237,6 +247,7 @@ class Api {
         } else {
             this.guessi += 1
             writeCandidateCount.call(this)
+            writeCandidates.call(this)
         }
         this.input = ''
         return this
@@ -246,11 +257,16 @@ class Api {
         $(`.${CLS.candCount}`, this.$root).toggle(value)
         return this
     }
+
+    toggleCandidates(value?: boolean): this {
+        this.$candidates.toggle(value)
+        return this
+    }
 }
 
 function highlightClue(this: Api, clue: Clue) {
-    $(`.${CLS.guess}:eq(${this.guessi})`, this.$root)
-        .find(`.${CLS.tile}`).each(function(i) {
+    this.$guess
+        .find(`.${CLS.tile}`).each(function(i: number) {
             const $tile = $(this)
             const clueCode = clue[i]
             switch (clueCode) {
@@ -271,7 +287,7 @@ function highlightClue(this: Api, clue: Clue) {
 
 function readClue(this: Api): Clue {
     const clue = new Clue
-    $(`.${CLS.guess}:eq(${this.guessi})`, this.$root)
+    this.$guess
         .find(`.${CLS.tile}`).each(function() {
             const $tile = $(this)
             if ($tile.hasClass(CLS.exact)) {
@@ -322,8 +338,30 @@ function setupControls(this: Api) {
     this.$root.append($fieldset)
 }
 
+function setupDetails(this: Api) {
+    $('<ul/>').addClass(CLS.candidates).appendTo(this.$root)
+}
+
+function getGuess(this: Api, i?: number): JQuery<HTMLElement> {
+    if (i === undefined) {
+        i = this.guessi
+    }
+    return $(`.${CLS.guess}:eq(${i})`, this.$root)
+}
+
+function writeCandidates(this: Api) {
+    const $cands = this.$candidates
+    $cands.empty()
+    if (this.guessi < 1) {
+        return
+    }
+    this.candidates.forEach(word => {
+        $('<li/>').text(word).appendTo($cands)
+    })
+
+}
 function writeCandidateCount(this: Api) {
-    $(`.${CLS.guess}:eq(${this.guessi})`, this.$root)
+    this.$guess
         .find(`.${CLS.candCount}`)
         .text(`${this.candidates.length}`)
 }
@@ -377,6 +415,9 @@ function keydown(e: KeyboardEvent) {
     }
     const key = e.key.toLowerCase()
     switch (key) {
+        case '%':
+            api.toggleCandidates()
+            return
         case '#':
             api.toggleCandidatesCount()
             return
